@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Wine Pairing</title>
+
+    <!-- Bootstrap 5.3 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+
+        /* 🔑 핵심: 뷰포트 80% 사용 */
+        .viewport-wrapper {
+            width: 80vw;
+            max-width: 1200px;   /* 초대형 화면 보호용 */
+            margin: 0 auto;
+        }
+
+        .pairing-card {
+            border-radius: 16px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+        }
+    </style>
+</head>
+<body>
+
+<div class="min-vh-100 d-flex align-items-center">
+    <div class="viewport-wrapper">
+
+        <div class="row justify-content-center">
+            <div class="col-12">
+
+                <div class="card pairing-card p-4 p-md-5">
+                    <!-- Title -->
+                    <h2 class="text-center mb-4 fw-semibold">
+                        🍷 Wine Pairing
+                    </h2>
+
+                    <!-- Image Upload Form -->
+                    <form action="/wine/pairing" method="post" enctype="multipart/form-data">
+
+                        <div class="mb-4">
+                            <label for="foodImage" class="form-label fw-semibold">
+                                요리 이미지 선택
+                            </label>
+                            <input
+                                type="file"
+                                class="form-control"
+                                id="foodImage"
+                                name="food_image"
+                                accept="image/*"
+                                required
+                            >
+                        </div>
+
+                        <!-- 반응형 버튼 -->
+                        <div class="d-grid d-md-flex gap-3 mt-4">
+                            <button type="submit" class="btn btn-primary flex-fill">
+                                와인 추천 받기
+                            </button>
+                            <button type="button" class="btn btn-secondary flex-fill" disabled>
+                                와인 추천 받기
+                            </button>
+                        </div>
+
+                    </form>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

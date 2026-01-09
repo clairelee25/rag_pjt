@@ -1,23 +1,50 @@
-from fastapi import FastAPI
-from wine_pairing import wine_pair_main
+from fastapi import FastAPI,  UploadFile, File
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi import HTTPException
+import base64
+import os
 
-# fastapi() 객체 생성
+from wine_pairing import wine_pair_main
+# FastAPI() 객체 생성
 app = FastAPI()
 
-# 홈
-@app.get("/")
-async def home(image_url: str):
-    # 사용자 image_url을 받음
-    print(image_url)
-    # 이미지의 요리명, 요리의 풍미 설명(llm) -> wine top-5 검색 -> 요리에 어울리는 와인 추천
-    # 1단계 결과: 이미지의 요리명, 요리의 풍미 설명(llm)
-    # img = "https://static.wtable.co.kr/image/production/service/recipe/2068/8e90b171-4b7c-44da-affc-bb9bc8297084.jpg?size=800x800"
-    # result = wine_pair_main(image_url)
-    result = "요리명 : 궁중 떡볶이 (Gungjung Tteokbokki)\n\n요리의 풍미:\n이 요리는 간장 양념을 기반으로 한 짭짤하고 고소하며 은은한 단맛이 특징입니다. 소고기, 표고버섯, 간장에서 우러나오는 복합적인 우마미가 중심을 이루며, 참기름과 통깨에서 오는 고소한 향과 풍미가 더해집니다. 당근에서는 자연스러운 단맛과 아삭함이, 대파에서는 미세한 향긋함이 느껴집니다. 전반적으로 매운맛은 없으며, 조리된 떡은 쫄깃하면서도 겉은 살짝 구워져 탄력 있는 식감을 제공하고, 소고기는 부드러우며, 채소는 적절히 익어 아삭하거나 부드러운 다양한 식감의 대비를 이룹니다."
-    print(result)
-    res = "llm을 통해 추천 받은 것을 사용자에게 반환"
-    return {"message": result}
+# templates 설정
+templates = Jinja2Templates(directory="templates")
 
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="localhost", port=8000, reload=True)
+# static 설정 (css/js 사용 시 필요)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# 홈
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request}
+    )
+
+# https://thumbnail.coupangcdn.com/thumbnails/remote/492x492ex/image/vendor_inventory/9d0d/fd3f0d77757f64b2eba0905dcdd85051932ec1ab5e6afc0c3246f403fabc.jpg
+@app.post("/wine-pairing")
+async def wine_pairing_api(file: UploadFile = File(...)):
+    try:
+        # 1. 이미지 파일 읽기
+        image_bytes = await file.read()
+
+        # 2. base64 인코딩
+        image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+
+        # 3. 핵심 로직 호출 (경로 ❌, base64 ✅)
+        result = wine_pair_main(image_base64)
+
+        return {
+            "filename": file.filename,
+            "result": result
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
