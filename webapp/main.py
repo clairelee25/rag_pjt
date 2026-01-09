@@ -29,22 +29,22 @@ async def home(request: Request):
     )
 
 # https://thumbnail.coupangcdn.com/thumbnails/remote/492x492ex/image/vendor_inventory/9d0d/fd3f0d77757f64b2eba0905dcdd85051932ec1ab5e6afc0c3246f403fabc.jpg
-@app.post("/wine-pairing")
+@app.post("/winepair")
 async def wine_pairing_api(file: UploadFile = File(...)):
     try:
+        print("file.filename", file.filename)
+
         # 1. 이미지 파일 읽기
         image_bytes = await file.read()
 
-        # 2. base64 인코딩
-        image_base64 = base64.b64encode(image_bytes).decode("utf-8")
-
-        # 3. 핵심 로직 호출 (경로 ❌, base64 ✅)
-        result = wine_pair_main(image_base64)
+        # 3. 핵심 로직 호출 (클라이언트에서 전달된 이미지 바이트 사용)
+        result = wine_pair_main(image_bytes)
 
         return {
-            "filename": file.filename,
             "result": result
         }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+

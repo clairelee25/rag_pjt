@@ -1,11 +1,11 @@
+import base64
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.runnables import RunnableLambda
 from langchain_openai import OpenAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
-from langchain_core.runnables import RunnableLambda
-from langchain_core.messages import HumanMessage, SystemMessage
 
 from dotenv import load_dotenv
 import os
@@ -24,30 +24,43 @@ embedding = OpenAIEmbeddings(
 
 # LLM을 통한 요리 정보 설명
 # 1. 함수 정의 : 이미지 -> 요리명, 풍미 설명 출력
-def describe_dish_flavor(query):
+def describe_dish_flavor(image_bytes: bytes):
     """
-    query = {
-        "image_base64": "..."
+    input_data = {
+        "image_bytes": b"...",   # 이미지 바이너리 데이터
+        "image_type": "image/jpeg"  # image/png 등
     }
     """
 
-    messages = [
-        SystemMessage(content="""
-            You are a highly skilled culinary expert.
-            Identify the dish and summarize its flavor profile in one concise English sentence.
-            """),
-        HumanMessage(
-            content=[
-                {"type": "text", "text": "Analyze the dish shown in the image."},
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{query['image_base64']}"
-                    }
-                }
-            ]
-        )
-    ]
+     # 1️⃣ LLM이 인식 가능한 data URL 생성
+    image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+    image_data_url = f"data:image/jpeg;base64,{image_base64}"
+
+    # 2️⃣ 프롬프트 구성
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", """
+        You are a culinary expert who analyzes food images.
+        Identify the commonly recognized name of the dish and
+        clearly describe its flavor, focusing on cooking method,
+        texture, aroma, and balance of taste.
+        """),
+        ("human", [
+            {
+                "type": "text",
+                "text": """
+                아래 이미지의 요리명과 요리의 풍미를 설명해 주세요.
+
+                출력 형식:
+                요리명:
+                요리의 풍미:
+                """
+            },
+            {
+                "type": "image_url",
+                "image_url": image_data_url
+            }
+        ])
+    ])
 
     llm = ChatOpenAI(
         model='gpt-4o-mini',
@@ -55,9 +68,8 @@ def describe_dish_flavor(query):
         api_key=OPENAI_API_KEY
     )
 
-    response = llm.invoke(messages)
-
-    return response.content
+    chain = prompt | llm | StrOutputParser()
+    return chain.invoke({})
 
 # 2. 함수 정의 : 요리 설명 -> 요리 설명, 와인 추천 (Top-5)
 def search_wines(query):
@@ -84,7 +96,7 @@ def search_wines(query):
     }
 
 # 3. 함수 정의 : 요리설명, top-5의 context 입력 받고 -> 요리에 어울리는 와인 추천 
-def recommand(query):
+def recommand(input_data):
     prompt = ChatPromptTemplate([
         ("system", """
     🍷 Wine Sommelier – System Prompt (Short / Optimized)
@@ -107,9 +119,11 @@ def recommand(query):
         요리 설명 : {query}
         와인 리뷰 : {wine_reviews}
         
-        답변은 json으로 다음과 같이 응답해 주세요.
-        wine recommandation: 
-        recommandation reason:
+        답변은 json으로 다음과 같이 응답해 주고, recommend_wine은 title만 작성해주세요.
+        recommend_wine: 
+        price:
+        country:
+        recommend_reason:
         """)
     ])
 
@@ -128,10 +142,10 @@ def recommand(query):
     # pipeline : 데이터의 흐름
     chain = prompt | llm | output_parser
 
-    return chain.invoke(query)
+    return chain.invoke(input_data)
 
 # 함수를 실행하는 코드
-def wine_pair_main(image_base64: str):
+def wine_pair_main(image_bytes: bytes):
     # RunnableLambda 객체 생성(데이터 파이프라인 연결을 위해)
     r1 = RunnableLambda(describe_dish_flavor)
     r2 = RunnableLambda(search_wines)
@@ -142,9 +156,7 @@ def wine_pair_main(image_base64: str):
 
     # RunnableLambda를 통한 함수 실행
     
-    res = chain.invoke({
-        "image_base64": image_base64
-    })
+    res = chain.invoke(image_bytes)
     return res
 
 # 모듈 테스트용 코드
@@ -156,9 +168,8 @@ if __name__ == "__main__":
 
     with open(image_path, "rb") as f:
         image_bytes = f.read()
-    image_base64 = base64.b64encode(image_bytes).decode("utf-8")
 
     # img_url = "https://thumbnail.coupangcdn.com/thumbnails/remote/492x492ex/image/vendor_inventory/9d0d/fd3f0d77757f64b2eba0905dcdd85051932ec1ab5e6afc0c3246f403fabc.jpg"
-    result = wine_pair_main(image_base64)
+    result = wine_pair_main(image_bytes)
     print(result)
 
